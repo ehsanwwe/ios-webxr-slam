@@ -10,7 +10,8 @@
 
 ---
 
-![Version](https://img.shields.io/badge/version-0.9.0--beta-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.0.0--alpha-orange?style=flat-square)
+![Status](https://img.shields.io/badge/status-early%20development-yellow?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-iOS%20Safari%20%7C%20Android%20Chrome-lightgrey?style=flat-square)
 ![Three.js](https://img.shields.io/badge/Three.js-r165-black?style=flat-square&logo=three.js)
@@ -42,16 +43,16 @@ a native app (ARKit), or degrades silently to nothing on iOS.
 
 ## ✨ Features
 
+> Status legend: ✅ implemented · 🔄 in progress · ⏳ planned
+
 | Feature | iOS Safari | Android Chrome |
 |---|---|---|
-| Camera overlay | ✅ | ✅ |
-| Gyroscope-based orientation | ✅ | ✅ |
-| Visual feature tracking (SLAM) | ✅ 🆕 | ✅ |
-| Plane / floor detection | ✅ 🆕 | ✅ via WebXR |
-| 3D object placement on surface | ✅ 🆕 | ✅ |
-| Drag / rotate placed object | ✅ | ✅ |
-| 3D avatar + animation (GLB/FBX) | ✅ | ✅ |
-| Voice AI integration | ✅ | ✅ |
+| Camera overlay | ⏳ Phase 1 | ⏳ Phase 2 |
+| Gyroscope-based orientation | ⏳ Phase 1 | ⏳ Phase 2 |
+| Visual feature tracking (SLAM) | ⏳ Phase 3 | via WebXR |
+| Plane / floor detection | ⏳ Phase 5 | via WebXR |
+| 3D object placement on surface | ⏳ Phase 5 | ⏳ Phase 2 |
+| Drag / rotate placed object | ⏳ Phase 1 | ⏳ Phase 2 |
 | Works without app install | ✅ | ✅ |
 | Works without paid SDK | ✅ | ✅ |
 
@@ -182,100 +183,83 @@ engine.start(); // auto-detects iOS vs WebXR, handles permissions
 ## 📁 Project Structure
 
 ```
-webarkit/
+.
 ├── src/
-│   ├── core/
-│   │   ├── WebARKit.js          # Main engine class
-│   │   ├── ModeRouter.js        # XR vs Gyro auto-detection
-│   │   └── SessionManager.js   # Permission flow
-│   ├── tracking/
-│   │   ├── GyroTracker.js       # DeviceOrientation → quaternion
-│   │   ├── VisualTracker.js     # WASM optical flow bridge
-│   │   ├── SensorFusion.js      # Gyro + visual → 6DOF pose
-│   │   └── PlaneDetector.js     # RANSAC surface detection
-│   ├── wasm/
-│   │   ├── fast_corners.cpp     # FAST feature detector (C++)
-│   │   ├── lk_tracker.cpp       # Lucas-Kanade tracker (C++)
-│   │   └── build.sh             # Emscripten build script
-│   ├── rendering/
-│   │   ├── CameraOverlay.js     # Camera feed compositor
-│   │   ├── Reticle.js           # Surface indicator
-│   │   └── AvatarLoader.js      # GLB/FBX + animation
-│   └── ui/
-│       ├── LoadingUI.js
-│       ├── StatusUI.js
-│       └── VoiceChat.js
-├── demo/
-│   ├── index.html
-│   └── avatar-demo.js
-├── tests/
-└── docs/
+│   ├── core/        # WebARKit, ModeRouter, SessionManager, EventEmitter
+│   ├── modes/       # XRMode (native WebXR), GyroMode (iOS fallback)
+│   ├── tracking/    # GyroTracker, VisualTracker, SensorFusion, PlaneDetector
+│   ├── rendering/   # CameraOverlay, Reticle, ARScene
+│   ├── input/       # GestureRecognizer, PointerRouter
+│   ├── utils/       # math, permissions, platform
+│   ├── workers/     # tracking.worker.js — owns WASM module
+│   └── wasm/        # fast_corners / lk_tracker / homography (C++ → WASM)
+├── demo/            # vite-served demo apps (HTTPS for camera access)
+├── types/           # public TypeScript definitions
+├── docs/            # ARCHITECTURE, API, IOS_NOTES, BUILDING_WASM
+└── tests/
 ```
 
 ---
 
 ## 🗺 Roadmap
 
-### ✅ Phase 1 — Gyro AR (Complete)
-- [x] iOS camera feed via `getUserMedia`
-- [x] `DeviceOrientationEvent` permission flow (iOS 13+)
-- [x] `computeDeviceQuat()` — screen-orientation-corrected quaternion
-- [x] Gyro calibration & reset on session start
-- [x] SLERP-smoothed camera rotation
-- [x] Three.js scene over camera feed
-- [x] GLB + FBX avatar loading with animation mixer
-- [x] Two-finger rotate gesture
-- [x] Single-finger drag (world XZ plane)
-- [x] Dual-mode auto-routing (XR / Gyro)
-- [x] WebXR hit-test drag (Android Chrome)
-- [x] Voice-to-voice AI assistant integration
-- [x] Timeline-based animation playback system
-- [x] In-scene GLB UI button interaction
+### 🔄 Phase 0 — Project skeleton (in progress)
+- [x] Repo layout, module stubs, demo scaffold
+- [x] Vite + Vitest tooling, HTTPS dev server
+- [x] TypeScript type-check pipeline (no emit)
+- [x] CLAUDE.md, CHANGELOG, ARCHITECTURE & IOS_NOTES docs scaffolding
 
 ---
 
-### 🔄 Phase 2 — Visual Tracking (In Progress)
-- [x] Camera frame capture via OffscreenCanvas
-- [ ] Web Worker pipeline for off-main-thread processing
-- [ ] FAST corner detector (WASM, compiled from C++)
-- [ ] Lucas-Kanade optical flow tracker (WASM)
-- [ ] Camera translation estimation from tracked points
-- [ ] Sensor fusion: gyro orientation + visual translation
-- [ ] Drift correction using feature re-detection
-- [ ] Pose smoothing & outlier rejection
+### ⏳ Phase 1 — Gyro AR
+- [ ] Port `IS_IOS` detection from reference
+- [ ] Port `requestSensorPermission()` (DeviceMotion + DeviceOrientation, iOS 13+ gesture-context)
+- [ ] Port `computeDeviceQuat()` — screen-orientation-corrected quaternion
+- [ ] Port gyro calibration & reset on session start
+- [ ] Port SLERP-smoothed camera rotation (`GYRO_CAMERA_SMOOTHING = 0.18`)
+- [ ] Port `getUserMedia` rear-camera overlay
+- [ ] Port two-finger rotate gesture (`ROTATE_GAIN = 1.0`)
+- [ ] Port single-finger drag (`DRAG_SENS_X/Y = 0.006`)
+- [ ] Port mode router (`navigator.xr.isSessionSupported('immersive-ar')`)
+- [ ] Demo 01 reproduces avatar-cam.js behavior end-to-end on real iPhone
 
 ---
 
-### 🔜 Phase 3 — Plane Detection & True SLAM
-- [ ] Point cloud accumulation over time
-- [ ] RANSAC-based planar surface fitting
-- [ ] Floor / table / wall classification
-- [ ] Reticle snapping to detected surface (WebXR hit-test parity)
-- [ ] Object placement on real surface (not fixed Z)
-- [ ] Surface mesh visualization (optional debug overlay)
-- [ ] Multi-plane tracking
+### ⏳ Phase 2 — Native WebXR delegate
+- [ ] `XRMode` ports the WebXR hit-test / `onSelect` flow from the reference
+- [ ] Same demo runs on Android Chrome via XRMode and iOS Safari via GyroMode
 
 ---
 
-### 🔮 Phase 4 — Advanced Features
-- [ ] Monocular depth estimation (TensorFlow.js / ONNX)
-- [ ] Occlusion: real objects hiding virtual ones
-- [ ] Light estimation from camera feed
-- [ ] Image target / marker tracking
-- [ ] Persistent world anchors (IndexedDB)
-- [ ] Multi-object scene management
-- [ ] iOS 18 WebXR support monitoring & auto-migration
+### ⏳ Phase 3 — Visual tracking
+- [ ] Emscripten build pipeline
+- [ ] FAST-9 corner detector (WASM)
+- [ ] Pyramidal Lucas-Kanade optical flow (WASM)
+- [ ] Worker pipeline with transferable `ImageBitmap`
+- [ ] Camera translation estimation
+- [ ] Debug overlay of tracked points
 
 ---
 
-### 📦 Phase 5 — SDK & Ecosystem
-- [ ] Clean public API with TypeScript types
-- [ ] npm package `webarkit`
-- [ ] React wrapper (`@webarkit/react`)
-- [ ] Webpack / Vite plugin
-- [ ] Example templates (avatar, furniture, product viewer)
-- [ ] Interactive documentation site
-- [ ] Performance benchmarks vs 8th Wall / AR.js / Mind-AR
+### ⏳ Phase 4 — Sensor fusion
+- [ ] Complementary filter combining gyro orientation + visual translation
+- [ ] Pose smoother with outlier rejection
+- [ ] Demo 02 — object stays anchored as the user translates (not just rotates)
+
+---
+
+### ⏳ Phase 5 — Plane detection
+- [ ] RANSAC homography for horizontal-plane fitting (WASM)
+- [ ] Multi-frame plane confirmation
+- [ ] Reticle snaps to detected surface (WebXR hit-test parity)
+- [ ] Demo 03 — furniture stays planted on the floor
+
+---
+
+### ⏳ Phase 6 — Polish & publish
+- [ ] Public API documentation in `docs/API.md`
+- [ ] Performance profiling on iPhone 12+
+- [ ] `npm publish` (dry-run, then real)
 
 ---
 
@@ -283,13 +267,12 @@ webarkit/
 
 | | **WebARKit** | 8th Wall | AR.js | Mind-AR |
 |---|---|---|---|---|
-| iOS Safari | ✅ | ✅ | ⚠️ limited | ⚠️ limited |
-| Surface tracking | ✅ (Phase 3) | ✅ | ❌ | ❌ |
+| iOS Safari | ✅ (in dev) | ✅ | ⚠️ limited | ⚠️ limited |
+| Surface tracking | ⏳ Phase 5 | ✅ | ❌ | ❌ |
 | Open source | ✅ | ❌ | ✅ | ✅ |
 | Free | ✅ | ❌ ($) | ✅ | ✅ |
 | Three.js native | ✅ | ⚠️ wrapper | ⚠️ wrapper | ⚠️ wrapper |
 | No app required | ✅ | ✅ | ✅ | ✅ |
-| Voice AI ready | ✅ | ❌ | ❌ | ❌ |
 
 ---
 
