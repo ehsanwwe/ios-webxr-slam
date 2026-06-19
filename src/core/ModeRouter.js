@@ -1,11 +1,20 @@
 /**
- * Decides whether to delegate to native WebXR (XRMode) or fall back to the
- * sensor + visual engine (GyroMode). Phase 0 stub — actual detection logic
- * (navigator.xr.isSessionSupported('immersive-ar') gated by APP_START_GESTURE)
- * is ported from avatar-cam.js in Phase 1.
+ * Picks which runtime mode WebARKit should run in. Must be called from a
+ * secure context (HTTPS) — navigator.xr.isSessionSupported() requires it.
  */
 export class ModeRouter {
+  /**
+   * @returns {Promise<'xr' | 'gyro'>}
+   */
   static async detect() {
+    if (navigator.xr) {
+      try {
+        const ok = await navigator.xr.isSessionSupported('immersive-ar');
+        if (ok) return 'xr';
+      } catch {
+        // fall through to gyro
+      }
+    }
     return 'gyro';
   }
 }

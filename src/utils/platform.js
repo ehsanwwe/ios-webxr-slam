@@ -1,19 +1,35 @@
 /**
- * Platform / capability detection. The IS_IOS check in Phase 1 must be
- * copied verbatim from avatar-cam.js (it includes the iPadOS 13+
- * MacIntel trick — desktop Safari spoofs the UA there).
+ * Best-effort iOS / iPadOS detection.
+ * iPadOS 13+ reports navigator.platform === 'MacIntel'; combine with
+ * maxTouchPoints to disambiguate from desktop macOS.
+ *
+ * @returns {boolean}
  */
-
 export function isIOS() {
-  // Phase 0 placeholder. Phase 1 replaces this with the verbatim port.
-  return false;
+  const ua = navigator.userAgent || '';
+  const iOSByUA = /iPad|iPhone|iPod/.test(ua);
+  const iPadOS13Plus =
+    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  return iOSByUA || iPadOS13Plus;
 }
 
-export async function hasImmersiveAR() {
-  if (typeof navigator === 'undefined' || !navigator.xr) return false;
-  try {
-    return await navigator.xr.isSessionSupported('immersive-ar');
-  } catch {
-    return false;
-  }
+/**
+ * Screen orientation in radians, with a fallback to window.orientation
+ * because some iOS versions return 0 from screen.orientation.angle.
+ *
+ * @returns {number}
+ */
+export function getScreenOrientationRad() {
+  const angle =
+    screen.orientation && typeof screen.orientation.angle === 'number'
+      ? screen.orientation.angle
+      : typeof window.orientation === 'number'
+        ? window.orientation
+        : 0;
+  return ((angle || 0) * Math.PI) / 180;
+}
+
+/** Whether MediaDevices.getUserMedia is available at all. */
+export function hasGetUserMedia() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
