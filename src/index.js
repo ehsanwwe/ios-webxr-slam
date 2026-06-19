@@ -1,6 +1,7 @@
 export { WebARKit, WebARKitError } from './core/WebARKit.js';
 export { ModeRouter } from './core/ModeRouter.js';
 export { GyroMode } from './modes/GyroMode.js';
+export { XRMode } from './modes/XRMode.js';
 export { GyroTracker } from './tracking/GyroTracker.js';
 export { CameraOverlay } from './rendering/CameraOverlay.js';
 export { GestureRecognizer } from './input/GestureRecognizer.js';

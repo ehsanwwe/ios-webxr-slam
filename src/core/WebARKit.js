@@ -1,5 +1,6 @@
 import { ModeRouter } from './ModeRouter.js';
 import { GyroMode } from '../modes/GyroMode.js';
+import { XRMode } from '../modes/XRMode.js';
 import { hasGetUserMedia, isIOS } from '../utils/platform.js';
 import { requestSensorPermissions } from '../utils/permissions.js';
 
@@ -16,9 +17,10 @@ export class WebARKitError extends Error {
  * camera plus a sceneRoot to be placed, then calls start() from inside a
  * user-gesture handler.
  *
- * WebARKit picks the right runtime mode (XR for Android Chrome, Gyro for
- * iOS Safari) and drives it. The XR delegate arrives in Phase 2 — for now
- * everything routes to GyroMode.
+ * WebARKit picks the right runtime mode (XR for Android Chrome / any
+ * immersive-ar capable browser, Gyro for iOS Safari and other fallbacks)
+ * and drives it. If XR start fails for any reason (permission, hardware,
+ * temporary failure), it transparently falls back to Gyro mode.
  *
  * @example
  *   const kit = new WebARKit({ renderer, camera, scene, canvas, sceneRoot });
@@ -41,7 +43,7 @@ export class WebARKit {
     }
     this.cfg = cfg;
     this.sceneRoot = cfg.sceneRoot || null;
-    /** @type {GyroMode | null} */
+    /** @type {GyroMode | XRMode | null} */
     this.mode = null;
     /** @type {'xr' | 'gyro' | null} */
     this.modeName = null;
@@ -66,7 +68,7 @@ export class WebARKit {
    * Boot the engine. Must be called from inside a user-gesture handler on
    * iOS so the DeviceMotion / DeviceOrientation permission prompts succeed.
    *
-   * @returns {Promise<'xr' | 'gyro'>}  the mode that was started
+   * @returns {Promise<'xr' | 'gyro'>}  the mode that was actually started
    */
   async start() {
     if (!hasGetUserMedia()) {
@@ -74,27 +76,47 @@ export class WebARKit {
         'navigator.mediaDevices.getUserMedia is not available',
       );
     }
+
+    // Permission prompts are no-ops on platforms that don't gate the APIs,
+    // so we can request them unconditionally and the gesture context is
+    // preserved for the XR session request that may follow.
     await requestSensorPermissions();
 
-    this.modeName = await ModeRouter.detect();
+    const detected = await ModeRouter.detect();
 
-    if (this.modeName === 'xr') {
-      // Phase 2: XRMode not yet implemented. Fall back so demos still run.
-      this.modeName = 'gyro';
+    if (detected === 'xr') {
+      try {
+        const xr = new XRMode({
+          renderer: this.cfg.renderer,
+          camera: this.cfg.camera,
+          scene: this.cfg.scene,
+        });
+        this._wire(xr);
+        await xr.start();
+        this.mode = xr;
+        this.modeName = 'xr';
+        return 'xr';
+      } catch (err) {
+        // XR start can fail for transient reasons (user dismissed prompt,
+        // device temporarily unavailable). Fall back to Gyro so the demo
+        // still runs instead of throwing all the way out.
+        // eslint-disable-next-line no-console
+        console.warn('[WebARKit] XR start failed, falling back to gyro:', err);
+        this.mode = null;
+      }
     }
 
-    this.mode = new GyroMode({
+    const gyro = new GyroMode({
       renderer: this.cfg.renderer,
       camera: this.cfg.camera,
       scene: this.cfg.scene,
       canvas: this.cfg.canvas,
     });
-    if (this.sceneRoot) this.mode.setSceneRoot(this.sceneRoot);
-    if (this._onBeforeRender) this.mode.setBeforeRender(this._onBeforeRender);
-    if (this._onPlace) this.mode.setOnPlace(this._onPlace);
-
-    await this.mode.start();
-    return this.modeName;
+    this._wire(gyro);
+    await gyro.start();
+    this.mode = gyro;
+    this.modeName = 'gyro';
+    return 'gyro';
   }
 
   stop() {
@@ -103,4 +125,10 @@ export class WebARKit {
   }
 
   isIOS() { return isIOS(); }
+
+  _wire(mode) {
+    if (this.sceneRoot) mode.setSceneRoot(this.sceneRoot);
+    if (this._onBeforeRender) mode.setBeforeRender(this._onBeforeRender);
+    if (this._onPlace) mode.setOnPlace(this._onPlace);
+  }
 }

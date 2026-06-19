@@ -19,29 +19,34 @@ description.
 
 ## Current Status
 
-- **Phase:** Phase 1 — Gyro AR (in progress)
-- **Last session ended:** 2026-06-19 — landed Phase 1 patch: ported
-  `avatar-cam.js` logic into modules (`GyroTracker`, `CameraOverlay`,
-  `GestureRecognizer`, `GyroMode`, `WebARKit`, `ModeRouter`), wrote first
-  real vitest tests for `math.js` and `GyroTracker`, built
-  `demo/01-basic-placement/` as the end-to-end smoke test.
-- **Next action:** Test demo 01 on a real iPhone over HTTPS (vite dev
-  server). When confirmed working, begin Phase 2: `src/modes/XRMode.js`
-  for native WebXR on Android Chrome, plus a small refactor in
-  `WebARKit.start()` to actually use it.
+- **Phase:** Phase 2 — Native WebXR delegate (in progress / mostly done)
+- **Last session ended:** 2026-06-19 — landed Phase 2 patch: built
+  `XRMode` (immersive-ar session, hit-test reticle, tap-to-place,
+  transient-input drag with offset snapshot), wired `WebARKit.start()`
+  to dispatch to XR when supported with a graceful fall back to Gyro on
+  failure. First XRMode test scaffold landed.
+- **Next action:** Test demo 01 on an Android Chrome device to confirm
+  XRMode actually drives the session end-to-end. Then begin Phase 3:
+  `src/tracking/VisualTracker.js` using jsfeat for FAST corners +
+  pyramidal Lucas-Kanade optical flow. Wire into `GyroMode` via the
+  existing `setVisualTracker()` hook.
 
 ---
 
 ## The single most important rule
 
-**`avatar-cam.js` (in the repo root) is the source of truth for Phase 1.**
-Do not rewrite its logic — port it. The constants below are battle-tested
-on real iOS hardware and must be preserved exactly:
+**`avatar-cam.js` (in the repo root) is the source of truth for the iOS
+gyro path.** Do not rewrite its logic — port it. The constants below are
+battle-tested on real iOS hardware and must be preserved exactly:
 
 - `GYRO_CAMERA_SMOOTHING = 0.18`
 - `DRAG_SENS_X = DRAG_SENS_Y = 0.006`
 - `ROTATE_GAIN = 1.0`
 - `GYRO_OBJECT_Z = -14.5` (placeholder until Phase 5)
+
+For the XR path, the WebXR API is the source of truth — no constants
+ported, but the hit-test and drag-with-offset-snapshot patterns match
+`avatar-cam.js`'s XR section conceptually.
 
 If you think you found a bug in `avatar-cam.js`, stop and ask Ehsan. You
 almost certainly didn't.
@@ -50,15 +55,15 @@ almost certainly didn't.
 
 ## Architecture (see docs/ARCHITECTURE.md for the deep dive)
 
-- **Dual-mode runtime:** `ModeRouter.detect()` picks `XRMode` if
-  `navigator.xr.isSessionSupported('immersive-ar')` is true, else
-  `GyroMode`. As of Phase 1, only `GyroMode` is implemented; the router
-  falls back to it even when XR is supported.
+- **Dual-mode runtime:** `ModeRouter.detect()` returns `'xr'` if
+  `navigator.xr.isSessionSupported('immersive-ar')` resolves true, else
+  `'gyro'`. `WebARKit.start()` dispatches accordingly. If XR start fails
+  for any reason it transparently falls back to Gyro.
 - **Threading:** main thread for Three.js / sensors / gestures; worker
   for camera frame processing and visual tracking (Phase 3). Frames go
   main → worker as transferable `ImageBitmap`.
 - **Sensor fusion:** complementary filter, not Kalman — simpler, fits
-  browser budget. Arrives in Phase 4.
+  browser budget. Arrives in Phase 4 and only matters for the gyro path.
 - **Visual tracker:** start with jsfeat (pure JS, ~150 KB) in Phase 3.
   WASM swap considered for Phase 5 or 6 only if performance demands it.
   We do **not** want to repeat AlvaAR's Emscripten dependency hell.
@@ -83,8 +88,8 @@ almost certainly didn't.
 - Errors thrown as actual `Error` subclasses, never plain strings
   (see `WebARKitError`, `PermissionDeniedError`).
 - No emoji in source code (README / docs only).
-- File names: PascalCase for class files (`GyroTracker.js`),
-  kebab-case otherwise.
+- File names: PascalCase for class files (`GyroTracker.js`,
+  `XRMode.js`), kebab-case otherwise.
 - Named exports only — no default exports for classes.
 - No commented-out alternative implementations.
   No `TODO: maybe later` — either add it or don't.
@@ -111,12 +116,23 @@ almost certainly didn't.
   device is rotated — fall back to `window.orientation`. Handled in
   `getScreenOrientationRad()`.
 - `getUserMedia` rear camera: use `facingMode: { ideal: 'environment' }`
-  not `exact` — `exact` fails on devices without a back camera (iPad
-  desk-mounted, etc.).
+  not `exact` — `exact` fails on devices without a back camera.
 - The Three.js camera quaternion must be reset before applying device
   orientation; otherwise calibration drifts. `GyroMode._place()` does this.
 - iPadOS 13+ reports `navigator.platform === 'MacIntel'`; combine with
   `navigator.maxTouchPoints > 1` to detect iPad. Handled in `isIOS()`.
+
+## Known Quirks & WebXR Gotchas
+
+- `requestHitTestSourceForTransientInput` is async and may fail on
+  devices that support `hit-test` for persistent input but not
+  transient. Catch and degrade — don't propagate.
+- `domOverlay` is requested as an **optional** feature so devices
+  without it still get the session (they just lose HTML overlay UI).
+- The first XR frame after `setSession()` may have no `frame` parameter
+  in `setAnimationLoop` — guard with `if (!frame) return;`.
+- Once `renderer.xr.setSession()` is called, Three.js drives the camera
+  projection — don't touch `camera.matrix*` manually in XR mode.
 
 See `docs/IOS_NOTES.md` for the running log.
 
@@ -127,7 +143,7 @@ See `docs/IOS_NOTES.md` for the running log.
 ```
 nvm use                 # respects .nvmrc (node 20)
 npm install
-npm run dev             # vite dev server with HTTPS — use ngrok/cloudflared for iOS device testing
+npm run dev             # vite dev server with HTTPS — use ngrok/cloudflared for device testing
 npm test                # vitest run
 npm run typecheck       # tsc --noEmit against JSDoc-annotated JS
 npm run build:wasm      # Phase 3+ — requires Emscripten SDK (deferred, may not happen)
@@ -146,9 +162,10 @@ npm run build:wasm      # Phase 3+ — requires Emscripten SDK (deferred, may no
 
 ## TODO Backlog (sorted by priority)
 
-1. Verify demo 01 on a real iPhone over HTTPS.
-2. Phase 2 — `src/modes/XRMode.js` for native WebXR on Android Chrome.
-   Update `WebARKit.start()` to dispatch to it.
+1. Verify demo 01 on an Android Chrome device — confirm XRMode session
+   starts, reticle appears on a flat surface, tap places, drag moves.
+2. Two-finger rotate in XRMode (deferred from Phase 2 — track 2 screen
+   XRInputSources and compute the angle between their target rays).
 3. Phase 3 — `src/tracking/VisualTracker.js` using jsfeat: FAST corners +
    pyramidal Lucas-Kanade. Wire into `GyroMode` via `setVisualTracker()`.
 4. Phase 4 — `src/tracking/SensorFusion.js`: complementary filter
@@ -161,25 +178,39 @@ npm run build:wasm      # Phase 3+ — requires Emscripten SDK (deferred, may no
 
 ## Session Log (last 5 only — trim older)
 
-### 2026-06-19
+### 2026-06-19 (Phase 2)
+
+- Built `src/modes/XRMode.js` from scratch using the standard WebXR
+  patterns: `requiredFeatures: ['local', 'hit-test']`, ring reticle on
+  the floor, `setAnimationLoop`-driven render loop.
+- Single-finger drag uses `requestHitTestSourceForTransientInput()`
+  with the offset-snapshot pattern: first hit captures
+  `dragOffset = sceneRoot.position - hitPos`, subsequent hits set
+  `sceneRoot.position = hitPos + dragOffset`. Y is locked to placement
+  height.
+- `WebARKit.start()` now dispatches to XR when `ModeRouter.detect()`
+  says so, with a fall back to Gyro on any failure. Added a
+  `_wire(mode)` helper to avoid duplicating the scene-root /
+  before-render / on-place wiring.
+- `tests/XRMode.test.js` covers state-only verification (constructor,
+  setters, missing navigator.xr).
+- Deferred: two-finger rotate in XRMode. Documented in
+  `Known Quirks & WebXR Gotchas` and TODO backlog.
+
+### 2026-06-19 (Phase 1)
 
 - Landed Phase 1 patch.
 - Wrote `utils/{platform,permissions,math}.js`, `tracking/GyroTracker.js`,
   `rendering/CameraOverlay.js`, `input/GestureRecognizer.js`,
   `modes/GyroMode.js`, `core/{WebARKit,ModeRouter}.js`, `index.js`.
-- Wrote `demo/01-basic-placement/` as smoke test — blue cube + grid
-  rendered against camera feed, tap to place, drag/two-finger rotate.
+- Wrote `demo/01-basic-placement/` as smoke test.
 - Wrote first real tests: `tests/math.test.js` (10 cases) and
-  `tests/GyroTracker.test.js` (3 cases). `npm test` now does something.
-- `WebARKit.start()` still routes XR-capable devices to GyroMode because
-  `XRMode` isn't built yet — explicitly noted in code.
+  `tests/GyroTracker.test.js` (3 cases).
 
 ### 2026-05-21
 
 - Scaffolded the repo: `.gitignore`, `.editorconfig`, `.nvmrc`.
-- Set up `package.json`, `vite.config.js` (HTTPS via
-  `@vitejs/plugin-basic-ssl`, root → `demo/`), `tsconfig.json`.
+- Set up `package.json`, `vite.config.js`, `tsconfig.json`.
 - Wrote module stubs for all 20+ files in `src/`.
-- Built `demo/` with three sub-demos and a landing index.
-- Rewrote README roadmap so it honestly reflects "nothing implemented yet".
-- Open thread: `avatar-cam.js` still needed before Phase 1 can begin.
+- Built `demo/` with three sub-demos.
+- Rewrote README roadmap to honestly reflect status.
