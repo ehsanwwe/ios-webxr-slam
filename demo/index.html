@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>WebARKit — Demos</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 16px;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        background: #0c0f14;
+        color: #e6e8ee;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem 1.25rem 4rem;
+      }
+      h1 { font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
+      p.tag { color: #9aa3b2; margin: 0 0 2rem; }
+      ul { list-style: none; padding: 0; margin: 0; width: min(28rem, 100%); display: grid; gap: 0.75rem; }
+      li a {
+        display: block;
+        padding: 1rem 1.25rem;
+        background: #161a23;
+        border: 1px solid #232838;
+        border-radius: 12px;
+        color: inherit;
+        text-decoration: none;
+      }
+      li a:hover { border-color: #3a4257; }
+      li small { display: block; color: #9aa3b2; margin-top: 0.25rem; }
+      footer { margin-top: auto; padding-top: 2rem; color: #5e6a82; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <h1>WebARKit demos</h1>
+    <p class="tag">Phase 0 — scaffold only. The engine is not implemented yet.</p>
+    <ul>
+      <li>
+        <a href="./01-basic-placement/">
+          01 · Basic placement
+          <small>Place a cube on tap. Drag. Two-finger rotate.</small>
+        </a>
+      </li>
+      <li>
+        <a href="./02-avatar/">
+          02 · Avatar
+          <small>Place a GLB avatar on the floor with animation.</small>
+        </a>
+      </li>
+      <li>
+        <a href="./03-furniture/">
+          03 · Furniture preview
+          <small>Anchor an object to a real surface and walk around it.</small>
+        </a>
+      </li>
+    </ul>
+    <footer>ios-webxr-slam · MIT · Ehsan Moradi</footer>
+  </body>
+</html>

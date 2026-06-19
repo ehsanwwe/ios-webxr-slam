@@ -1,0 +1,34 @@
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.vite/
+
+# WASM build intermediates
+src/wasm/build/
+src/wasm/*.o
+src/wasm/*.bc
+*.wasm.map
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
